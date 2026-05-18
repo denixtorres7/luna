@@ -1,1 +1,177 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Luna - Chimenea que se apaga</title>
+  <style>
+    html, body {
+      margin: 0;
+      width: 1536px;
+      height: 1024px;
+      overflow: hidden;
+      background: #000;
+    }
 
+    #escena {
+      position: relative;
+      width: 1536px;
+      height: 1024px;
+      overflow: hidden;
+      background: #fff;
+      font-family: system-ui, sans-serif;
+    }
+
+    #fondo {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1536px;
+      height: 1024px;
+      z-index: 1;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    /* La escena inicia un poco apagada: una chimenea real no ilumina toda la habitación. */
+    #sombraGlobal {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.18);
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    /* Luz cálida centrada justo sobre la llama. Ajustar left/top si se mueve el dibujo. */
+    #luzChimenea {
+      position: absolute;
+      left: 365px;
+      top: 610px;
+      width: 260px;
+      height: 260px;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(
+        circle,
+        rgba(255, 213, 92, 0.62) 0%,
+        rgba(255, 157, 48, 0.38) 22%,
+        rgba(255, 111, 28, 0.16) 45%,
+        rgba(255, 111, 28, 0) 70%
+      );
+      mix-blend-mode: screen;
+      filter: blur(5px);
+      opacity: 0.72;
+      z-index: 4;
+      pointer-events: none;
+      animation: parpadeo 0.85s infinite alternate ease-in-out;
+    }
+
+    /* Oscuridad final: deja una pequeña zona tenue cerca de la chimenea. */
+    #veloFinal {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(
+        circle at 365px 610px,
+        rgba(0,0,0,0.05) 0%,
+        rgba(0,0,0,0.42) 24%,
+        rgba(0,0,0,0.78) 100%
+      );
+      opacity: 0;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    #botonInicio {
+      position: absolute;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%);
+      z-index: 10;
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 20px;
+      background: rgba(0,0,0,0.72);
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(0,0,0,.25);
+    }
+
+    @keyframes parpadeo {
+      from { transform: translate(-50%, -50%) scale(0.96); opacity: 0.62; }
+      to   { transform: translate(-50%, -50%) scale(1.05); opacity: 0.78; }
+    }
+  </style>
+</head>
+<body>
+  <main id="escena">
+    <img id="fondo" src="fondo_pag_3.png" alt="Escena de Luna junto a la chimenea" />
+    <div id="sombraGlobal"></div>
+    <div id="luzChimenea"></div>
+    <div id="veloFinal"></div>
+
+    <button id="botonInicio">Iniciar escena</button>
+
+    <!-- Pon el audio en la misma carpeta con este nombre -->
+    <audio id="audioChimenea" src="chimenea.mp3" preload="auto" loop></audio>
+  </main>
+
+  <script>
+    // Cambio más rápido de luz: 12 segundos.
+    const DURACION = 6000;
+
+    const boton = document.getElementById('botonInicio');
+    const audio = document.getElementById('audioChimenea');
+    const sombra = document.getElementById('sombraGlobal');
+    const luz = document.getElementById('luzChimenea');
+    const velo = document.getElementById('veloFinal');
+
+    let iniciado = false;
+
+    boton.addEventListener('click', iniciarEscena);
+
+    async function iniciarEscena() {
+      if (iniciado) return;
+      iniciado = true;
+      boton.style.display = 'none';
+
+      audio.volume = 0.75;
+      try {
+        await audio.play();
+      } catch (e) {
+        console.warn('El navegador bloqueó el audio hasta que haya interacción del usuario.', e);
+      }
+
+      const inicio = performance.now();
+
+      function animar(tiempoActual) {
+        const progreso = Math.min((tiempoActual - inicio) / DURACION, 1);
+
+        // Curva más directa: se nota el apagado desde el inicio.
+        const p = Math.pow(progreso, 0.85);
+
+        audio.volume = Math.max(0, 0.75 * (1 - p));
+
+        // La luz se contrae y se apaga sobre la llama.
+        luz.style.opacity = Math.max(0, 0.72 * (1 - p * 1.15));
+        luz.style.transform = `translate(-50%, -50%) scale(${1 - p * 0.62})`;
+        luz.style.animationDuration = `${0.85 + p * 1.8}s`;
+
+        // Parte desde una habitación poco iluminada y termina oscura.
+        sombra.style.background = `rgba(0, 0, 0, ${0.18 + p * 0.46})`;
+        velo.style.opacity = p * 0.78;
+
+        if (progreso < 1) {
+          requestAnimationFrame(animar);
+        } else {
+          audio.pause();
+          audio.currentTime = 0;
+          luz.style.opacity = 0;
+          sombra.style.background = 'rgba(0, 0, 0, 0.64)';
+          velo.style.opacity = 0.78;
+        }
+      }
+
+      requestAnimationFrame(animar);
+    }
+  </script>
+</body>
+</html>
